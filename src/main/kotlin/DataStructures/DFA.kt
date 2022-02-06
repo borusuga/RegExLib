@@ -6,24 +6,27 @@ class DFA(rawString: String = "") {
     private var pos = 1
     private var clearTokens: MutableList<Node?> = mutableListOf(null)
     private var alphabet: MutableList<Char?> = mutableListOf()
-    private var states: MutableList<State> = mutableListOf()
+    var states: MutableList<State> = mutableListOf()
     private var min_states: MutableList<State> = mutableListOf()
     // error_pos = 0
     var stateNum = 0
     var start_state: State? = null
     private var last_states: MutableList<State> = mutableListOf()
-    var current_ctate: State? = null
-    // for testing //////////////////////
-    fun addState(state: State) {
-        states.add(state)
-    }
-    fun setAlph(alphabet: MutableList<Char?>) {
-        this.alphabet = alphabet
-    }
-    fun setP_FP(p_fp: MutableMap<Int, MutableList<Int>>) {
-        this.p_fp = p_fp
-    }
-    /////////////////////////////////////
+    var current_state: State? = null
+
+    var captureGroups: MutableList<DFA> = mutableListOf()
+
+    // for testing ///////////////////////////////////////////////
+    fun addState(state: State) {                                //
+        states.add(state)                                       //
+    }                                                           //
+    fun setAlph(alphabet: MutableList<Char?>) {                 //
+        this.alphabet = alphabet                                //
+    }                                                           //
+    fun setP_FP(p_fp: MutableMap<Int, MutableList<Int>>) {      //
+        this.p_fp = p_fp                                        //
+    }                                                           //
+    //////////////////////////////////////////////////////////////
 
     init {
         if (rawString.isNotEmpty()) {
@@ -33,14 +36,14 @@ class DFA(rawString: String = "") {
 
     fun changeCurrState(letter: Char?): State? {
         var isExist = false
-        findLoop@for (transition in this.current_ctate!!.transitions) {
+        findLoop@for (transition in this.current_state!!.transitions) {
             if (transition.first == letter) {
                 isExist = true
-                this.current_ctate = transition.second
+                this.current_state = transition.second
                 break@findLoop
             }
         }
-        return if (isExist) this.current_ctate else null
+        return if (isExist) this.current_state else null
     }
 
     fun minimize(): DFA {
@@ -114,10 +117,12 @@ class DFA(rawString: String = "") {
         } else{     // если изменилось - перестраиваем
             for (group in P) {
 //            min_states.add(State(P.indexOf(group)))
-                if (0 in group) {
+                if (0 in group) {   // если ошибочная позиция есть в группе (ErrorState обычно на нулевой позиции)
                     min_states.add(0, State(P.indexOf(group)))
                     min_states[0].isError = true
-                    min_states[0].addPositions(states[0].positions)
+                    for (n in group) {
+                        min_states[0].addPositions(states[n].positions)
+                    }
                 } else if (1 in group) {
                     var st = State(P.indexOf(group))
                     st.addPositions(states[1].positions)
@@ -169,7 +174,23 @@ class DFA(rawString: String = "") {
                 }
             }
         }
+
         val dfa = DFA()
+
+        // поиск start_position
+        for (st in min_states) {
+            if (st.positions.contains(this.start_state!!.positions)) {
+                dfa.start_state = st
+            }
+        }
+
+        // поиск last_positions
+        for (st in min_states) {
+            if (st.receiving) {
+                dfa.last_states.add(st)
+            }
+        }
+
         dfa.alphabet = this.alphabet
         for (minState in this.min_states) {
             dfa.addState(minState)
@@ -365,29 +386,63 @@ class DFA(rawString: String = "") {
     }
 
     // построение дополнения к языку
-    fun buildComplement(): DFA{
+    fun buildComplement(alphabet: MutableList<Char> = mutableListOf()): DFA{
         val dfa = DFA()
-        //  dfa.alphabet = this.alphabet.toMutableList()
+
+        // построение нового алфивита
+        var alphSet: MutableSet<Char?> = mutableSetOf()
+        alphSet.addAll(this.alphabet)
+        alphSet.addAll(alphabet)
+        dfa.alphabet = alphSet.toMutableList()
+
         var complementStates = mutableListOf<State>()
+
+        // запоминаем error-state
+        var errorState: State? = null
+        // запоминаем start-state
+        var startState: State? = null
+
         // создание состояний нового автомата-дополнения
         for (oldState in this.states) {
             val newState = State(oldState.n, receiving = oldState.receiving.xor(true))
             newState.addPositions(oldState.positions.toMutableList())
             complementStates.add(newState)
+            if (oldState.isError) errorState = newState
+            if (oldState == this.start_state) startState = newState
         }
         // добавление переходов в новый автомат
         for (stateNum in this.states.indices) {
-            for (oldTransition in this.states[stateNum].transitions) {
-                complementStates[stateNum].addTransition(oldTransition.first, complementStates[oldTransition.second.n])
+//            for (oldTransition in this.states[stateNum].transitions) {
+//                complementStates[stateNum].addTransition(oldTransition.first, complementStates[oldTransition.second.n])
+//            }
+            for (letter in alphSet) {
+                for (oldTransition in this.states[stateNum].transitions) {
+                    // надо проверить есть ли переход с такой буквой
+                    // если есть, то добавляем, если нет, то добавляем переход в ранее-error-state
+                    if (letter == oldTransition.first)
+                        complementStates[stateNum].addTransition(oldTransition.first, complementStates[oldTransition.second.n])
+                    else {
+                        if (errorState != null) {
+                            complementStates[stateNum].addTransition(letter, errorState)
+                        }
+                    }
+                }
             }
         }
         dfa.states = complementStates
+        dfa.start_state = startState
         return dfa
     }
 
     // построение пересечения языков
     fun intersection(other: DFA): DFA {
         val dfa = DFA()
+
+        var set: MutableSet<Char?> = mutableSetOf()
+        set.addAll(this.alphabet)
+        set.addAll(other.alphabet)
+
+        dfa.alphabet = set.toMutableList()
         //  создание состояний нового автомата
         var intersectionStates = mutableListOf<State>()
         var n = 0
@@ -407,9 +462,6 @@ class DFA(rawString: String = "") {
                 dfa.start_state = newState
             }
             if (!newState.processed){
-                var set: MutableSet<Char?> = mutableSetOf()
-                set.addAll(this.alphabet)
-                set.addAll(other.alphabet)
                 if (newState.isError) {
                     // если состояние ошибочное, то добавляем переходы в само себя
                     for (symbol in set) {
@@ -469,7 +521,15 @@ class DFA(rawString: String = "") {
                 intersectionStates[i].n = i++
             }
         }
+
+        // новые позиции для каждого state
+        i = 0
+        for (state in intersectionStates) {
+            state.positions.clear()
+            state.positions.add(i++)
+        }
         dfa.states = intersectionStates
+
         return dfa
     }
 
@@ -483,20 +543,20 @@ class DFA(rawString: String = "") {
     }
 
     fun recoverKpath(): String {
-        val k = this.states.size - 1
+        val k = this.states.size
         var k_vec: Array<Array<Array<String?>>> = Array(k) { Array(k) { Array(k) { null } } }
         // заполнение базиса (при k = 0)
         for (state in this.states) {
             if (state.n != 0) {
                 for (transition in state.transitions) {
                     if (transition.second.n != 0) {
-                        k_vec[0]!![state.n - 1][transition.second.n - 1] = transition.first.toString()
+                        k_vec[0]!![state.n][transition.second.n] = transition.first.toString()
                     }
                 }
             }
         }
-        for (i in 0 until k) {
-            for (j in 0 until k) {
+        for (i in 1 until k) {
+            for (j in 1 until k) {
                 if (k_vec[0]!![i][j].isNullOrBlank()) {
                     if (i == j) {
                         k_vec[0]!![i][j] = "#"
@@ -504,9 +564,11 @@ class DFA(rawString: String = "") {
                 }
             }
         }
+
+        // заполнение уровней 1..k (k - число состояний)
         for (level in 1 until k) {
-            for (i in 0 until k) {
-                for (j in 0 until k) {
+            for (i in 1 until k) {
+                for (j in 1 until k) {
                     val r1 = k_vec[level-1][i][j]
                     val r2 = k_vec[level-1][i][level]
                     val r3 = k_vec[level-1][level][level]
@@ -518,19 +580,22 @@ class DFA(rawString: String = "") {
                     } else if (null in mutableListOf(r2, r3, r4)){
                         k_vec[level][i][j] = r1
                     } else {
-                        k_vec[level][i][j] = "$r1|($r2($r3)*$r4)"
+                        if ((r2 == r3) && (r3 == r4)) k_vec[level][i][j] = "$r1|($r3)*"
+                        else if (r2 == r3) k_vec[level][i][j] = "$r1|(($r3)*$r4)"
+                        else if (r3 == r4) k_vec[level][i][j] = "$r1|($r2($r3)*)"
+                        else k_vec[level][i][j] = "$r1|($r2($r3)*$r4)"
                     }
                 }
             }
         }
         var regexp = ""
         for (last_state in this.last_states) {
-            var str = k_vec[k-1][this.start_state!!.n-1][last_state.n-1]
+            var str = k_vec[k-1][this.start_state!!.n][last_state.n]
             if (str != null){
                 if (start_state == last_state) {
-                    k_vec[k - 1][this.start_state!!.n-1][last_state.n-1] = "(${str})*"
+                    k_vec[k - 1][this.start_state!!.n][last_state.n] = "(${str})*"
                 }
-            regexp += "${k_vec[k - 1][this.start_state!!.n-1][last_state.n-1]}|"
+            regexp += "${k_vec[k - 1][this.start_state!!.n][last_state.n]}|"
             }
         }
         return regexp.dropLast(1)

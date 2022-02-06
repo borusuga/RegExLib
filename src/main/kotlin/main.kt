@@ -1,5 +1,4 @@
 import DataStructures.DFA
-import DataStructures.NFA
 import DataStructures.RegExp
 import DataStructures.State
 
@@ -8,43 +7,50 @@ fun main(){
     // "\\(\\(a\\|\\b\\)\\*'\\{25\\}\\)"
     // "\\(b\\{3\\}\\|a\\*\\)p" // "(b{3}|a*)p"
     // "[]abc*(d|e){2}\\(\\1[rof\\(]" // "abc*(d|e){2}"
-    val s = "(abc)*"//"([as#d]|a*)p\\1"//"l#{3}k"//"([as#d]|a*)p\\1" // "(b{3}|a*)p"   "([asd]|a*)p"
+    val s = "([as#d]|a*)p\\1"//"(a|bd*c)*bd*"//"([as#d]|a*)p\\1"//"(abc)*"//"([as#d]|a*)p\\1"//"l#{3}k"//"([as#d]|a*)p\\1" // "(b{3}|a*)p"   "([asd]|a*)p"
 
     // testing //////////////
     //mins()                 //
     //intersection()         //
     //regexp_intersection()  //
-    findMatches()          //
+    //findMatches()
+    //complement()
     /////////////////////////
 
 //    val nfa = NFA(s)
 //    nfa.treeToNFA()
 //    nfa.minimize()
-//    val dfa = DFA(s)
-//    dfa.treeToDFA()
-//    val re = dfa.recoverKpath()
+    val dfa = DFA(s)
+    val re = dfa.recoverKpath()
     //var complement = dfa.buildComplement()
-    //dfa.minimize()
+    dfa.minimize()
     println("End")
 }
 
 fun findMatches() {
-    val re = RegExp("aa*bb*")
+    val re = RegExp("aa*bb*") //"(a|(bd*c))*bd*") //
     re.compile()
-    val matches = re.findall("abaabbabbb")
+    val matches = re.findAll("abaabbabbb") //"abdcbd")//
 }
+
+/**
+ * пересечение
+ * минимизация пересечения
+ * поиск по пересечению
+ */
 fun regexp_intersection() {
-    val re = RegExp("aa*bb*")
-    re.compile()
-    val s = "ab*"
-    val dfa = DFA(s)
-    val dfa1 = re.complement()
-    val dfa2 = re.intersection(s)
-    val dfa3 = re.intersection(dfa)
+    val dfa1 = DFA("a*")    //  "a*"
+    val dfa2 = DFA("b*")
+    val dfa3 = dfa1.intersection(dfa2)
+    val re1 = RegExp("")
+    re1.dfa = dfa3.minimize()
+    val m = re1.findAll("")
+    val s = re1.dfa.recoverKpath()
 }
 
 fun complement() {
-    val s = "([as#d]|a*)p\\1"
+    val s = "(a|bd*c)*bd*"//"([as#d]a*|)p\\1"
+    val s1 = "(a|bd*c)*bd*|(a|bd*c)*"
     val dfa = DFA(s)
     val complement = dfa.buildComplement()
     println("END")

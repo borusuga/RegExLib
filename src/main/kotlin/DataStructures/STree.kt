@@ -5,8 +5,8 @@ import java.util.ArrayDeque
 
 
 class STree(private var rawString: String) {
-    private var tokens: MutableList<Node> = mutableListOf()
-    private lateinit var numberedGroups: MutableList<Node?>
+    var tokens: MutableList<Node> = mutableListOf()
+    lateinit var numberedGroups: MutableList<Node?>
     var tree: Node? = null
     init {
         if (rawString.isNotEmpty()) {
@@ -193,22 +193,43 @@ class STree(private var rawString: String) {
                 }
             }
         }
+        // a|bc => (a or b) concat c
+//        i = 0
+//        while (i < captureTokens.size) {    // processing OR
+//            if (captureTokens[i].getType() == TreeNodes.OR) {
+//                captureTokens[i].addChild(captureTokens.subList(i - 1, i + 2))
+//                captureTokens.removeAt(i + 1)
+//                captureTokens.removeAt(i - 1)
+//            } else
+//                ++i
+//        }
+//        i = 0
+//        while (i < captureTokens.size-1) {  // processing CONCAT
+//            val concatNode = Concat("+").createNode()
+//            concatNode.addChild(captureTokens.subList(i, i + 2))
+//            captureTokens.removeAt(i + 1)
+//            captureTokens.removeAt(i)
+//            captureTokens.add(i, concatNode)
+//        }
+
+        // a|bc => a or (b concat c)
         i = 0
-        while (i < captureTokens.size) {    // processing OR
+        while (i < captureTokens.size-1) {  // processing CONCAT
+            if ((captureTokens[i].getType() != TreeNodes.OR) && (captureTokens[i+1].getType() != TreeNodes.OR)) {   // не конкатенируем пустой токен or
+                val concatNode = Concat("+").createNode()
+                concatNode.addChild(captureTokens.subList(i, i + 2))
+                captureTokens.removeAt(i + 1)
+                captureTokens.removeAt(i)
+                captureTokens.add(i, concatNode)
+            } else ++i
+        }
+        i = 0
+        while (i < captureTokens.size - 1) {    // processing OR
             if (captureTokens[i].getType() == TreeNodes.OR) {
                 captureTokens[i].addChild(captureTokens.subList(i - 1, i + 2))
                 captureTokens.removeAt(i + 1)
                 captureTokens.removeAt(i - 1)
-            } else
-                ++i
-        }
-        i = 0
-        while (i < captureTokens.size-1) {  // processing CONCAT
-            val concatNode = Concat("+").createNode()
-            concatNode.addChild(captureTokens.subList(i, i + 2))
-            captureTokens.removeAt(i + 1)
-            captureTokens.removeAt(i)
-            captureTokens.add(i, concatNode)
+            } else ++i
         }
         return captureTokens[0]
     }
